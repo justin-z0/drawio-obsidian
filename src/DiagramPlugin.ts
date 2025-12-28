@@ -21,6 +21,7 @@ import {
   TFile,
   TFolder,
   WorkspaceLeaf,
+  normalizePath,
 } from "obsidian";
 import DiagramView from "./DiagramView";
 import {
@@ -179,7 +180,19 @@ export default class DiagramPlugin extends Plugin {
         .setTitle("Insert new diagram")
         .setIcon("create-new-diagram")
         .onClick(async () => {
-          const file = await this.createNewDiagramFile(view.file.parent);
+          // 文件中插入的图表保存到全局配置的附件目录
+          let attachmentFolder = await this.app.vault.getConfig("attachmentFolderPath");
+          // normalizePath 无法处理路径中的 ./ 和 ../ 等相对路径，需要手动处理
+          if (attachmentFolder.startsWith("./")) {
+            attachmentFolder = attachmentFolder.substring(2);
+          }
+          attachmentFolder = normalizePath(`${view.file.parent.path}/${attachmentFolder}`);
+          let folder = this.app.vault.getFolderByPath(attachmentFolder);
+          if (!folder || !(folder instanceof TFolder)) {
+            folder = await this.app.vault.createFolder(attachmentFolder);
+          }
+
+          const file = await this.createNewDiagramFile(folder);
           editor.replaceSelection(`![[${file.path}]]`);
           const leaf = this.app.workspace.getLeaf(true);
           await leaf.setViewState({
